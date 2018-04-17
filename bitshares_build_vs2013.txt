@@ -1,0 +1,192 @@
+1. github上，下载bitshares
+2. 打开bitshares/doc/BUILD_WIN32.md
+3. 下载的东西在1.third上
+4. 根据BUILD_WIN32.md，把boost，cmake，openssl-1.0.1g
+5. boost，openssl 都没有编译，需要编译，在后边会写出
+6. cd D:\bitshares, 创建 setenv_x64.bat，把下面的写到里面：
+@echo off
+set GRA_ROOT=D:\3.work\3.blackchain\bitshares
+set OPENSSL_ROOT=%GRA_ROOT%\openssl-1.0.1g
+set OPENSSL_ROOT_DIR=%OPENSSL_ROOT%
+set OPENSSL_INCLUDE_DIR=%OPENSSL_ROOT%\include
+set BOOST_ROOT=%GRA_ROOT%\boost_1_57_0
+
+set PATH=%GRA_ROOT%\CMake\bin;%BOOST_ROOT%\lib;%PATH%
+
+echo Setting up VS2013 environment...
+call "%VS120COMNTOOLS%\..\..\VC\vcvarsall.bat" x86_amd64
+
+7. 然后运行setenv_x64.bat
+8. 跟着官网https://github.com/bitshares/bitshares-core/wiki/BUILD_WIN32
+
+* Build OpenSSL DLLs
+```
+D:
+cd D:\3.work\3.blackchain\bitshares\openssl-1.0.1g
+perl Configure --openssldir=D:\3.work\3.blackchain\bitshares\OpenSSL VC-WIN64A no-asm no-hw
+ms\do_win64a
+nmake -f ms\ntdll.mak
+nmake -f ms\ntdll.mak install
+```
+
+  This will create the directory `D:\3.work\3.blackchain\bitshares\OpenSSL` with the libraries, DLLs,
+  and header files.
+
+* Build Boost
+```
+D:
+cd D:\bitshares\boost_1_57_0
+bootstrap
+.\b2.exe address-model=64
+```
+
+
+编译openssl
+
+问题1：
+“ms\uplink.c(11) : fatal error C1083: Cannot open include file: 'windows.h': No such file or directory NMAKE : fatal error U1077: 'cl' : 
+return code '0x2' Stop.错误的时候” 
+解决：先运行vcvars32命令，vcvars32.bat用于设置VC命令行编译的环境变量。
+
+问题2：
+遇到错误：tmp32dll\x86_64cpuid.asm(1) : error A2088:END directive required at end of file
+
+解决：打开D:\openssl-1.0.2-beta2\tmp32dll\x86_64cpuid.asm 输入END保存即可。
+
+问题3：
+nmake 命令找不到
+解决：把C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin 添加到path中
+
+===========================================
+
+### Build project files for BitShares Core ####
+
+* Run CMake:
+
+修改setenv_x64.bat中
+set OPENSSL_ROOT=%GRA_ROOT%\openssl-1.0.1g
+改成
+set OPENSSL_ROOT=%GRA_ROOT%\OpenSSL
+
+
+
+```
+D:
+cd D:\bitshares\bitshares-core
+notepad run_cmake_x64.bat
+```
+Put this into the notepad window, then save and quit.
+```
+setlocal
+call "d:\bitshares\setenv_x64.bat"
+cd %GRA_ROOT%
+cmake-gui -G "Visual Studio 12"
+```
+Then run
+```
+run_cmake_x64.bat
+```
+
+ This pops up the cmake gui, but if you've used CMake before it will probably be
+ showing the wrong data, so fix that:
+ * Where is the source code: `D:\bitshares\bitshares-core`
+ * Where to build the binaries: `D:\bitshares\x64` 
+
+ Then hit **Configure**.  It may ask you to specify a generator for this
+ project; if it does, choose **Visual Studio 12 2013 Win64** for 64 bit builds and select **Use default
+ native compilers**.  Look through the output and fix any errors.  Then
+ hit **Generate**.
+
+
+* Launch *Visual Studio* and load `D:\bitshares\x64\BitShares.sln` 
+* Set Active Configuration to `RelWithDebInfo`, ensure Active Solution platform is `x64` for 64 bit builds
+
+* *Build Solution*
+
+Or you can build the `INSTALL` target in Visual Studio which will
+copy all of the necessary files into your `D:\bitshares\install`
+directory, then copy all of those files to the `bin` directory.
+
+
+VS2013 win64 编译
+问题1：
+出现typename 错误，如fee_schedule.hpp，出现如下：
+typename account_create_operation::fee_parameters_type& get(flat_set<fee_parameters>& parameters)const
+
+解决：
+	// by zhangjianping
+	//typename account_create_operation::fee_parameters_type& get(flat_set<fee_parameters>& parameters)const
+	account_create_operation::fee_parameters_type& get(flat_set<fee_parameters>& parameters)const
+
+
+问题2：
+出现openssl cmd copy 问题，是因为路径不对
+
+解决：
+把路径修改掉
+
+问题3：
+无法打开包括文件: “curl/curl.h”: No such file or directory
+
+解决：
+把curl 头文件copy进去
+
+问题4：
+编译graphene_egenesis_full 时，出现cmd.exe 错误
+
+原因:
+查看VS工程，原来是cmd脚本出现错误，编译脚本
+setlocal
+cd D:\3.work\3.blackchain\bitshares\x64\libraries\egenesis
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+D:\3.work\3.blackchain\bitshares\x64\libraries\egenesis\Release\embed_genesis.exe -t D:/3.work/3.blackchain/bitshares/bitshares-core/libraries/egenesis/egenesis_brief.cpp.tmpl---D:/3.work/3.blackchain/bitshares/x64/libraries/egenesis/egenesis_brief.cpp -t D:/3.work/3.blackchain/bitshares/bitshares-core/libraries/egenesis/egenesis_full.cpp.tmpl---D:/3.work/3.blackchain/bitshares/x64/libraries/egenesis/egenesis_full.cpp --genesis-json D:/3.work/3.blackchain/bitshares/bitshares-core/genesis.json
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+
+把编译脚本拿出来运行，出现有ssleay32.dll 找不到的问题，应该是路径没有设置对
+
+解决：
+把ssleay32.dll 的openssl 的路径设置到脚本中，我使用的是RelWithDebInfo 编译环境，打开vcxproj，把下面的copy进去，编译就好
+@echo off
+set GRA_ROOT=D:\3.work\3.blackchain\bitshares
+set OPENSSL_ROOT=%GRA_ROOT%\OpenSSL
+
+set PATH=%OPENSSL_ROOT%\bin;%PATH%
+
+
+问题5：
+链接时 curl.lib 找不到
+
+解决：
+下载 curl-7.47.0， 编译vc12的， x64 libdebug
+
+把libcurld.lib 修改名字 curl.lib copy 到 D:\3.work\3.blackchain\bitshares\x64\programs\witness_node\RelWithDebInfo\ 
+
+问题6：
+curl.lib 导入后出现 __imp_curl_slist_append 找不到
+
+原因是：
+curl.lib  打包是静态库
+
+解决：
+在vs 工程环境中，C++ -> 预处理中加入
+DEBUGBUILD
+CURL_STATICLIB
+
+graphene_elasticsearch 也有问题，在使用curl 的时候没有设置预处理，需要加上
+DEBUGBUILD
+CURL_STATICLIB
+
+大功告成，编译完成 ^_^
+
+
+
+
+
